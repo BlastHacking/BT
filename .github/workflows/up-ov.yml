@@ -1,26 +1,23 @@
 name: UP OV Fi
 on:
   schedule:
-    - cron: '0 0 * * *' # هر روز ساعت 00:00 UTC اجرا می‌شه (هر 24 ساعت)
-  workflow_dispatch: { } # امکان اجرای دستی هم داره
+    - cron: '0 0 * * *'
+  workflow_dispatch: { }
 jobs:
   update-ovpn:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # اجازه نوشتن در مخزن رو می‌ده
+      contents: write
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4 # مخزن شما رو چک‌اوت می‌کنه
+        uses: actions/checkout@v4
       - name: Remove Old OVPN Files
         run: |
-          rm -f *.ovpn # فایل‌های قبلی .ovpn رو حذف می‌کنه
+          rm -f *.ovpn
       - name: Download New OVPN Files
         run: |
-          # دانلود همه فایل‌های .ovpn از شاخه vpn مخزن mudachyo/proxy-list
           wget -r -np -nH --cut-dirs=3 -A "*.ovpn" https://github.com/mudachyo/proxy-list/raw/master/vpn/
-          # انتقال فایل‌ها از پوشه vpn به ریشه مخزن
           mv vpn/*.ovpn .
-          # حذف پوشه موقتی vpn
           rm -rf vpn
       - name: Commit and Push Changes
         run: |
