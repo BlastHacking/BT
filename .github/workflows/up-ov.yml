@@ -1,7 +1,7 @@
 name: UP OV Fi
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 0 * * *' # هر روز ساعت 00:00 UTC
   workflow_dispatch: { }
 jobs:
   update-ovpn:
@@ -11,14 +11,19 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
       - name: Remove Old OVPN Files
         run: |
-          rm -f *.ovpn
-      - name: Download New OVPN Files
+          rm -f *.ovpn # فایل‌های قبلی رو حذف می‌کنه
+
+      - name: Clone Source Repository
         run: |
-          wget -r -np -nH --cut-dirs=3 -A "*.ovpn" https://github.com/mudachyo/proxy-list/raw/master/vpn/
-          mv vpn/*.ovpn .
-          rm -rf vpn
+          git clone https://github.com/mudachyo/proxy-list.git source-repo
+          cd source-repo/vpn
+          mv *.ovpn ../../ # فایل‌های .ovpn رو به ریشه مخزن منتقل می‌کنه
+          cd ../..
+          rm -rf source-repo # مخزن موقتی رو پاک می‌کنه
+
       - name: Commit and Push Changes
         run: |
           git config --global user.name "GitHub Action"
