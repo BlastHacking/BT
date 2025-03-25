@@ -14,13 +14,14 @@ jobs:
 
       - name: Remove Old OVPN Files
         run: |
-          rm -f *.ovpn # فایل‌های قبلی رو حذف می‌کنه
+          rm -f *.ovpn # فقط فایل‌های .ovpn رو حذف می‌کنه
+          ls -la       # برای دیباگ، نشون می‌ده چی توی ریشه مونده
 
-      - name: Clone Source Repository
+      - name: Clone Source Repository and Move OVPN Files
         run: |
           git clone https://github.com/mudachyo/proxy-list.git source-repo
           cd source-repo/vpn
-          mv *.ovpn ../../ # فایل‌های .ovpn رو به ریشه مخزن منتقل می‌کنه
+          mv *.ovpn ../../ # فایل‌های .ovpn جدید رو به ریشه منتقل می‌کنه
           cd ../..
           rm -rf source-repo # مخزن موقتی رو پاک می‌کنه
 
