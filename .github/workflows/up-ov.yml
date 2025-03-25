@@ -14,8 +14,11 @@ jobs:
 
       - name: Remove Old OVPN Files
         run: |
-          rm -f *.ovpn # فقط فایل‌های .ovpn رو حذف می‌کنه
-          ls -la       # برای دیباگ، نشون می‌ده چی توی ریشه مونده
+          # پیدا کردن و حذف همه فایل‌های .ovpn
+          find . -type f -name "*.ovpn" -exec rm -f {} \;
+          # حذف فایل‌های .ovpn از git index اگه توی مخزن بودن
+          git rm -f *.ovpn || echo "فایل‌های .ovpn توی git نبودن"
+          ls -la  # برای دیباگ، نشون می‌ده چی مونده
 
       - name: Clone Source Repository and Move OVPN Files
         run: |
