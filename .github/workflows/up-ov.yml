@@ -1,7 +1,7 @@
 name: UP OV Fi
 on:
   schedule:
-    - cron: '0 0 * * *' # هر روز ساعت 00:00 UTC
+    - cron: '0 0 * * *'
   workflow_dispatch: {}
 
 jobs:
@@ -15,19 +15,17 @@ jobs:
 
       - name: Remove Old OVPN Files
         run: |
-          # پیدا کردن و حذف همه فایل‌های .ovpn
           find . -type f -name "*.ovpn" -exec rm -f {} \;
-          # حذف فایل‌های .ovpn از git index اگه توی مخزن بودن
-          git rm -f *.ovpn 2>/dev/null || echo "فایل‌های .ovpn توی git نبودن"
-          ls -la  # برای دیباگ، نشون می‌ده چی مونده
+          git rm -f *.ovpn 2>/dev/null || true
 
-      - name: Clone Source Repository and Move OVPN Files
+      - name: Download only OVPN files from configs
         run: |
-          git clone https://github.com/fdciabdul/Vpngate-Scraper-API.git source-repo
-          cd source-repo/configs
-          mv *.ovpn ../../ # فایل‌های .ovpn جدید رو به ریشه منتقل می‌کنه
-          cd ../..
-          rm -rf source-repo # مخزن موقتی رو پاک می‌کنه
+          git clone --filter=blob:none --sparse --depth 1 https://github.com/fdciabdul/Vpngate-Scraper-API.git source-repo
+          cd source-repo
+          git sparse-checkout set configs
+          mv configs/*.ovpn ../ || echo "هیچ فایل .ovpn پیدا نشد"
+          cd ..
+          rm -rf source-repo
 
       - name: Commit and Push Changes
         run: |
