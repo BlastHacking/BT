@@ -16,49 +16,49 @@ jobs:
       - name: Remove Old OVPN Files
         run: |
           echo "=== Removing old .ovpn files ==="
-          find . -type f -name "*.ovpn" -exec rm -f {} \;
+          find . -maxdepth 1 -type f -name "*.ovpn" -delete
           git rm -f *.ovpn 2>/dev/null || true
           echo "Old files removed."
 
-      - name: Download OVPN from Vpngate-Scraper-API
+      - name: Download OVPN from Vpngate-Scraper-API (Source 1)
         run: |
-          echo "=== Downloading from Source 1 ==="
+          echo "=== Source 1: Vpngate ==="
           git clone --filter=blob:none --sparse --depth 1 https://github.com/fdciabdul/Vpngate-Scraper-API.git source-repo
           cd source-repo
           git sparse-checkout set configs
 
-          python3 -c '
+          python3 << 'EOF'
           import os
           import shutil
           from datetime import datetime
 
           configs_dir = "configs"
-          counter = 1
+          if not os.path.isdir(configs_dir):
+              print("ERROR: configs folder not found")
+              exit(1)
 
-          if not os.path.exists(configs_dir):
-              print("configs folder not found!")
-          else:
-              files = [f for f in os.listdir(configs_dir) if f.endswith(".ovpn")]
-              print(f"Found {len(files)} ovpn files in Source 1")
-              
-              for filename in sorted(files):
-                  src = os.path.join(configs_dir, filename)
-                  timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                  new_name = f"s1_{timestamp}_{counter:03d}.ovpn"
-                  dst = os.path.join("..", new_name)
-                  shutil.move(src, dst)
-                  print(f"[Source1] {new_name}")
-                  counter += 1
-          '
+          files = sorted([f for f in os.listdir(configs_dir) if f.endswith(".ovpn")])
+          print(f"Found {len(files)} files")
+
+          for i, filename in enumerate(files, 1):
+              src = os.path.join(configs_dir, filename)
+              # نام فایل اصلی را هم نگه می‌داریم تا یکتا باشد
+              safe_name = filename.replace(".ovpn", "").replace(" ", "_")
+              timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+              new_name = f"s1_{timestamp}_{i:03d}_{safe_name}.ovpn"
+              dst = os.path.join("..", new_name)
+              shutil.copy2(src, dst)   # copy به جای move
+              print(f"[S1] {new_name}")
+          EOF
 
           cd ..
           rm -rf source-repo
-          echo "Source 1 finished."
+          echo "Source 1 done."
 
-      - name: Download OVPN from 9xN/auto-ovpn
+      - name: Download OVPN from 9xN/auto-ovpn (Source 2)
         run: |
-          echo "=== Downloading from Source 2 ==="
-          python3 -c '
+          echo "=== Source 2: JSON ==="
+          python3 << 'EOF'
           import os
           import json
           import base64
@@ -67,61 +67,68 @@ jobs:
 
           url = "https://raw.githubusercontent.com/9xN/auto-ovpn/main/json/data.json"
           print("Downloading data.json ...")
-          
-          with urllib.request.urlopen(url) as response:
-              data = json.loads(response.read().decode())
 
-          counter = 1
+          with urllib.request.urlopen(url) as resp:
+              data = json.loads(resp.read().decode())
+
           created = 0
-          
           for item in data:
               if not isinstance(item, dict):
                   continue
-                  
-              servers = item.get("servers", [])
-              for server in servers:
+
+              for server in item.get("servers", []):
                   b64 = server.get("openvpn_configdata_base64")
                   if not b64:
                       continue
-                  
+
                   try:
                       content = base64.b64decode(b64).decode("utf-8", errors="ignore")
+                      hostname = server.get("hostname", "unknown").replace(" ", "_")
+                      ip = server.get("ip", "0.0.0.0")
                       timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                      filename = f"s2_{timestamp}_{counter:03d}.ovpn"
-                      
+                      created += 1
+                      filename = f"s2_{timestamp}_{created:03d}_{hostname}_{ip}.ovpn"
+
                       with open(filename, "w", encoding="utf-8") as f:
                           f.write(content)
-                      
-                      print(f"[Source2] {filename}")
-                      counter += 1
-                      created += 1
+
+                      print(f"[S2] {filename}")
                   except Exception as e:
-                      print(f"Error: {e}")
-          
-          print(f"Total created from Source 2: {created}")
-          '
+                      print(f"Error on {server.get('hostname')}: {e}")
 
-      - name: Show created files
+          print(f"Total from Source 2: {created}")
+          EOF
+
+      - name: Verify uniqueness
         run: |
-          echo "=== Files currently in repo ==="
-          ls -la *.ovpn 2>/dev/null | head -40 || echo "No .ovpn files found"
-          echo "..."
+          echo "=== Verification ==="
           echo "Total .ovpn files:"
-          ls *.ovpn 2>/dev/null | wc -l || echo "0"
+          ls *.ovpn 2>/dev/null | wc -l
 
-      - name: Commit and Push Changes
+          echo ""
+          echo "Sample of files:"
+          ls *.ovpn 2>/dev/null | head -15
+
+          echo ""
+          echo "Checking if files have different content (first 10 MD5):"
+          md5sum *.ovpn 2>/dev/null | head -10
+
+          echo ""
+          echo "Unique MD5 count (should be close to total files):"
+          md5sum *.ovpn 2>/dev/null | awk '{print $1}' | sort | uniq | wc -l
+
+      - name: Commit and Push
         run: |
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
-          
           git add *.ovpn
-          
+
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
             git commit -m "به‌روزرسانی فایل‌های OVPN - $(date +'%Y-%m-%d %H:%M')"
             git push
-            echo "Successfully pushed!"
+            echo "Pushed successfully"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
