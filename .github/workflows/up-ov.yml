@@ -27,11 +27,11 @@ jobs:
           counter=1
           for file in configs/*.ovpn; do
             if [ -f "$file" ]; then
-              timestamp=$(date +%Y%m%d%H%M%S)
-              padded=$(printf "%03d" $counter)
+              timestamp=date +%Y%m%d%H%M%S
+              padded=printf "%03d" $counter
               new_name="\( {timestamp}_ \){padded}.ovpn"
-              mv "$file" "../$new_name"
-              echo "Moved: $file → $new_name"
+              mv "\( file" "../ \){new_name}"
+              echo "Moved --> ${new_name}"
               counter=$((counter + 1))
             fi
           done
