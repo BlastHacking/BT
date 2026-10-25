@@ -23,19 +23,18 @@ jobs:
           git clone --filter=blob:none --sparse --depth 1 https://github.com/fdciabdul/Vpngate-Scraper-API.git source-repo
           cd source-repo
           git sparse-checkout set configs
-          
-          # فایل‌ها رو با نام یکتا (تاریخ + ساعت + ثانیه + شمارنده) منتقل می‌کنیم
+
           counter=1
           for file in configs/*.ovpn; do
             if [ -f "$file" ]; then
-              new_name=\( (date +"%Y%m%d%H%M%S")_ \)(printf "%03d" $counter).ovpn
+              timestamp=$(date +"%Y%m%d%H%M%S")
+              new_name="\( {timestamp}_ \)(printf "%03d" $counter).ovpn"
               mv "$file" "../$new_name"
               echo "Moved: $file → $new_name"
               counter=$((counter + 1))
-              sleep 1
             fi
           done
-          
+
           cd ..
           rm -rf source-repo
 
