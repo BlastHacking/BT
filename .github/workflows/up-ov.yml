@@ -18,7 +18,7 @@ jobs:
           find . -type f -name "*.ovpn" -exec rm -f {} \;
           git rm -f *.ovpn 2>/dev/null || true
 
-      - name: Download only OVPN files from configs
+      - name: Download OVPN from Vpngate-Scraper-API
         run: |
           git clone --filter=blob:none --sparse --depth 1 https://github.com/fdciabdul/Vpngate-Scraper-API.git source-repo
           cd source-repo
@@ -39,12 +39,49 @@ jobs:
                   new_name = f"{timestamp}_{counter:03d}.ovpn"
                   dst = os.path.join("..", new_name)
                   shutil.move(src, dst)
-                  print(f"Moved: {filename} → {new_name}")
+                  print(f"[Source1] Moved: {filename} → {new_name}")
                   counter += 1
           '
 
           cd ..
           rm -rf source-repo
+
+      - name: Download OVPN from 9xN/auto-ovpn (data.json)
+        run: |
+          python3 -c '
+          import os
+          import json
+          import base64
+          import urllib.request
+          from datetime import datetime
+
+          url = "https://raw.githubusercontent.com/9xN/auto-ovpn/main/json/data.json"
+          print("Downloading data.json ...")
+          
+          with urllib.request.urlopen(url) as response:
+              data = json.loads(response.read().decode())
+
+          counter = 1
+          for item in data:
+              servers = item.get("servers", [])
+              for server in servers:
+                  b64 = server.get("openvpn_configdata_base64")
+                  if not b64:
+                      continue
+                  
+                  try:
+                      content = base64.b64decode(b64).decode("utf-8", errors="ignore")
+                      timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                      filename = f"{timestamp}_{counter:03d}.ovpn"
+                      
+                      with open(filename, "w", encoding="utf-8") as f:
+                          f.write(content)
+                      
+                      print(f"[Source2] Created: {filename}")
+                      counter += 1
+                  except Exception as e:
+                      print(f"Error decoding one config: {e}")
+          '
 
       - name: Commit and Push Changes
         run: |
