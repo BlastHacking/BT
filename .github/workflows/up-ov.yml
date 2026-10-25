@@ -24,17 +24,24 @@ jobs:
           cd source-repo
           git sparse-checkout set configs
 
-          counter=1
-          for file in configs/*.ovpn; do
-            if [ -f "$file" ]; then
-              timestamp=date +%Y%m%d%H%M%S
-              padded=printf "%03d" $counter
-              new_name="\( {timestamp}_ \){padded}.ovpn"
-              mv "\( file" "../ \){new_name}"
-              echo "Moved --> ${new_name}"
-              counter=$((counter + 1))
-            fi
-          done
+          python3 -c '
+          import os
+          import shutil
+          from datetime import datetime
+
+          configs_dir = "configs"
+          counter = 1
+
+          for filename in sorted(os.listdir(configs_dir)):
+              if filename.endswith(".ovpn"):
+                  src = os.path.join(configs_dir, filename)
+                  timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+                  new_name = f"{timestamp}_{counter:03d}.ovpn"
+                  dst = os.path.join("..", new_name)
+                  shutil.move(src, dst)
+                  print(f"Moved: {filename} → {new_name}")
+                  counter += 1
+          '
 
           cd ..
           rm -rf source-repo
