@@ -15,116 +15,85 @@ jobs:
 
       - name: Remove Old OVPN Files
         run: |
-          echo "=== Removing old .ovpn files ==="
           find . -maxdepth 1 -type f -name "*.ovpn" -delete
           git rm -f *.ovpn 2>/dev/null || true
-          echo "Old files removed."
 
-      - name: Download OVPN from Vpngate-Scraper-API (Source 1)
+      - name: Download from both sources
         run: |
-          echo "=== Source 1: Vpngate ==="
-          git clone --filter=blob:none --sparse --depth 1 https://github.com/fdciabdul/Vpngate-Scraper-API.git source-repo
-          cd source-repo
-          git sparse-checkout set configs
-
-          python3 << 'EOF'
-          import os
-          import shutil
-          from datetime import datetime
-
-          configs_dir = "configs"
-          if not os.path.isdir(configs_dir):
-              print("ERROR: configs folder not found")
-              exit(1)
-
-          files = sorted([f for f in os.listdir(configs_dir) if f.endswith(".ovpn")])
-          print(f"Found {len(files)} files")
-
-          for i, filename in enumerate(files, 1):
-              src = os.path.join(configs_dir, filename)
-              # نام فایل اصلی را هم نگه می‌داریم تا یکتا باشد
-              safe_name = filename.replace(".ovpn", "").replace(" ", "_")
-              timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-              new_name = f"s1_{timestamp}_{i:03d}_{safe_name}.ovpn"
-              dst = os.path.join("..", new_name)
-              shutil.copy2(src, dst)   # copy به جای move
-              print(f"[S1] {new_name}")
-          EOF
-
-          cd ..
-          rm -rf source-repo
-          echo "Source 1 done."
-
-      - name: Download OVPN from 9xN/auto-ovpn (Source 2)
-        run: |
-          echo "=== Source 2: JSON ==="
           python3 << 'EOF'
           import os
           import json
           import base64
+          import shutil
           import urllib.request
           from datetime import datetime
+          from pathlib import Path
 
+          timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+
+          # ========== Source 1: Vpngate ==========
+          print("=== Source 1: Vpngate ===")
+          os.system("git clone --filter=blob:none --sparse --depth 1 https://github.com/fdciabdul/Vpngate-Scraper-API.git source-repo")
+          os.chdir("source-repo")
+          os.system("git sparse-checkout set configs")
+
+          counter = 1
+          configs_dir = Path("configs")
+          if configs_dir.exists():
+              files = sorted([f for f in configs_dir.iterdir() if f.suffix == ".ovpn"])
+              print(f"Found {len(files)} files from Source 1")
+              for f in files:
+                  new_name = f"s1_{timestamp}_{counter:03d}.ovpn"
+                  shutil.copy2(f, Path("..") / new_name)
+                  print(f"[S1] {new_name}")
+                  counter += 1
+          os.chdir("..")
+          shutil.rmtree("source-repo", ignore_errors=True)
+
+          # ========== Source 2: JSON ==========
+          print("\n=== Source 2: JSON ===")
           url = "https://raw.githubusercontent.com/9xN/auto-ovpn/main/json/data.json"
-          print("Downloading data.json ...")
-
           with urllib.request.urlopen(url) as resp:
               data = json.loads(resp.read().decode())
 
+          counter = 1
           created = 0
           for item in data:
               if not isinstance(item, dict):
                   continue
-
               for server in item.get("servers", []):
                   b64 = server.get("openvpn_configdata_base64")
                   if not b64:
                       continue
-
                   try:
                       content = base64.b64decode(b64).decode("utf-8", errors="ignore")
-                      hostname = server.get("hostname", "unknown").replace(" ", "_")
-                      ip = server.get("ip", "0.0.0.0")
-                      timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                      created += 1
-                      filename = f"s2_{timestamp}_{created:03d}_{hostname}_{ip}.ovpn"
-
-                      with open(filename, "w", encoding="utf-8") as f:
+                      new_name = f"s2_{timestamp}_{counter:03d}.ovpn"
+                      with open(new_name, "w", encoding="utf-8") as f:
                           f.write(content)
-
-                      print(f"[S2] {filename}")
+                      print(f"[S2] {new_name}")
+                      counter += 1
+                      created += 1
                   except Exception as e:
-                      print(f"Error on {server.get('hostname')}: {e}")
+                      print(f"Error: {e}")
 
-          print(f"Total from Source 2: {created}")
+          print(f"\nTotal from Source 2: {created}")
           EOF
 
-      - name: Verify uniqueness
+      - name: Show result
         run: |
-          echo "=== Verification ==="
           echo "Total .ovpn files:"
           ls *.ovpn 2>/dev/null | wc -l
-
           echo ""
-          echo "Sample of files:"
+          echo "Sample names:"
           ls *.ovpn 2>/dev/null | head -15
-
-          echo ""
-          echo "Checking if files have different content (first 10 MD5):"
-          md5sum *.ovpn 2>/dev/null | head -10
-
-          echo ""
-          echo "Unique MD5 count (should be close to total files):"
-          md5sum *.ovpn 2>/dev/null | awk '{print $1}' | sort | uniq | wc -l
 
       - name: Commit and Push
         run: |
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
           git add *.ovpn
-
           if git diff --staged --quiet; then
-            echo "No changes to commit"
+            echo "No changes"
           else
             git commit -m "به‌روزرسانی فایل‌های OVPN - $(date +'%Y-%m-%d %H:%M')"
             git push
