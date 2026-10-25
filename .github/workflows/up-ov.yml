@@ -44,7 +44,7 @@ jobs:
               for filename in sorted(files):
                   src = os.path.join(configs_dir, filename)
                   timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                  new_name = f"{timestamp}_{counter:03d}.ovpn"
+                  new_name = f"s1_{timestamp}_{counter:03d}.ovpn"
                   dst = os.path.join("..", new_name)
                   shutil.move(src, dst)
                   print(f"[Source1] {new_name}")
@@ -87,7 +87,7 @@ jobs:
                   try:
                       content = base64.b64decode(b64).decode("utf-8", errors="ignore")
                       timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-                      filename = f"{timestamp}_{counter:03d}.ovpn"
+                      filename = f"s2_{timestamp}_{counter:03d}.ovpn"
                       
                       with open(filename, "w", encoding="utf-8") as f:
                           f.write(content)
@@ -104,10 +104,10 @@ jobs:
       - name: Show created files
         run: |
           echo "=== Files currently in repo ==="
-          ls -la *.ovpn | head -20
+          ls -la *.ovpn 2>/dev/null | head -40 || echo "No .ovpn files found"
           echo "..."
           echo "Total .ovpn files:"
-          ls *.ovpn 2>/dev/null | wc -l
+          ls *.ovpn 2>/dev/null | wc -l || echo "0"
 
       - name: Commit and Push Changes
         run: |
