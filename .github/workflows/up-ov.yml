@@ -15,11 +15,14 @@ jobs:
 
       - name: Remove Old OVPN Files
         run: |
+          echo "=== Removing old .ovpn files ==="
           find . -type f -name "*.ovpn" -exec rm -f {} \;
           git rm -f *.ovpn 2>/dev/null || true
+          echo "Old files removed."
 
       - name: Download OVPN from Vpngate-Scraper-API
         run: |
+          echo "=== Downloading from Source 1 ==="
           git clone --filter=blob:none --sparse --depth 1 https://github.com/fdciabdul/Vpngate-Scraper-API.git source-repo
           cd source-repo
           git sparse-checkout set configs
@@ -32,22 +35,29 @@ jobs:
           configs_dir = "configs"
           counter = 1
 
-          for filename in sorted(os.listdir(configs_dir)):
-              if filename.endswith(".ovpn"):
+          if not os.path.exists(configs_dir):
+              print("configs folder not found!")
+          else:
+              files = [f for f in os.listdir(configs_dir) if f.endswith(".ovpn")]
+              print(f"Found {len(files)} ovpn files in Source 1")
+              
+              for filename in sorted(files):
                   src = os.path.join(configs_dir, filename)
                   timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
                   new_name = f"{timestamp}_{counter:03d}.ovpn"
                   dst = os.path.join("..", new_name)
                   shutil.move(src, dst)
-                  print(f"[Source1] Moved: {filename} → {new_name}")
+                  print(f"[Source1] {new_name}")
                   counter += 1
           '
 
           cd ..
           rm -rf source-repo
+          echo "Source 1 finished."
 
-      - name: Download OVPN from 9xN/auto-ovpn (data.json)
+      - name: Download OVPN from 9xN/auto-ovpn
         run: |
+          echo "=== Downloading from Source 2 ==="
           python3 -c '
           import os
           import json
@@ -62,6 +72,8 @@ jobs:
               data = json.loads(response.read().decode())
 
           counter = 1
+          created = 0
+          
           for item in data:
               if not isinstance(item, dict):
                   continue
@@ -80,18 +92,36 @@ jobs:
                       with open(filename, "w", encoding="utf-8") as f:
                           f.write(content)
                       
-                      print(f"[Source2] Created: {filename}")
+                      print(f"[Source2] {filename}")
                       counter += 1
+                      created += 1
                   except Exception as e:
-                      print(f"Error decoding one config: {e}")
+                      print(f"Error: {e}")
+          
+          print(f"Total created from Source 2: {created}")
           '
+
+      - name: Show created files
+        run: |
+          echo "=== Files currently in repo ==="
+          ls -la *.ovpn | head -20
+          echo "..."
+          echo "Total .ovpn files:"
+          ls *.ovpn 2>/dev/null | wc -l
 
       - name: Commit and Push Changes
         run: |
           git config --global user.name "GitHub Action"
           git config --global user.email "action@github.com"
+          
           git add *.ovpn
-          git commit -m "به‌روزرسانی فایل‌های OVPN - $(date +'%Y-%m-%d')" || echo "هیچ تغییری برای کامیت وجود ندارد"
-          git push
+          
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "به‌روزرسانی فایل‌های OVPN - $(date +'%Y-%m-%d %H:%M')"
+            git push
+            echo "Successfully pushed!"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
